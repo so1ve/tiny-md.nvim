@@ -6,6 +6,7 @@ local user_config = {}
 local doc_config = {
   anti_conceal = { enabled = false },
   link = { enabled = false },
+  code = { language = false },
   win_options = {
     concealcursor = { rendered = "nvic" },
   },

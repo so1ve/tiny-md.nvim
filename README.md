@@ -66,12 +66,14 @@ Use tiny-md for blink.cmp documentation:
 {
   "saghen/blink.cmp",
   dependencies = {
-    "MeanderingProgrammer/render-markdown.nvim",
+    "so1ve/tiny-md.nvim",
   },
   opts = {
     completion = {
       documentation = {
-        draw = require("tiny-md.blink").draw,
+        draw = function(opts)
+          require("tiny-md.blink").draw(opts)
+        end,
       },
     },
   },

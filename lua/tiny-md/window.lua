@@ -113,17 +113,39 @@ function M.open(ctx)
   if ctx.source_buf then
     close_group = vim.api.nvim_create_augroup(("tiny-md-window-%d"):format(win), { clear = true })
 
-    vim.api.nvim_create_autocmd({
-      "BufHidden",
-      "BufWipeout",
-      "CursorMoved",
-      "CursorMovedI",
-      "FileChangedShellPost",
-      "InsertEnter",
-      "TextChanged",
-      "TextChangedI",
-      "TextChangedP",
-    }, { group = close_group, buffer = ctx.source_buf, callback = close })
+    vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI", "InsertCharPre" }, {
+      group = close_group,
+      buffer = ctx.source_buf,
+      callback = function()
+        vim.schedule(close)
+      end,
+    })
+
+    vim.api.nvim_create_autocmd("BufLeave", {
+      group = close_group,
+      buffer = ctx.source_buf,
+      callback = function()
+        vim.schedule(function()
+          if not close_group then
+            return
+          end
+
+          local current_buf = vim.api.nvim_get_current_buf()
+
+          if current_buf == buf or current_buf == ctx.source_buf then
+            return
+          end
+
+          close()
+        end)
+      end,
+    })
+
+    vim.api.nvim_create_autocmd("BufLeave", {
+      group = close_group,
+      buffer = buf,
+      callback = close,
+    })
 
     vim.api.nvim_create_autocmd("WinClosed", {
       group = close_group,

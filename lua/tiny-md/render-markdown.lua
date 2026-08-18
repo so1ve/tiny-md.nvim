@@ -10,6 +10,11 @@ local doc_config = {
   html = {
     tag = {
       code = { scope_highlight = "RenderMarkdownCodeInline" },
+      kbd = { scope_highlight = "RenderMarkdownCodeInline" },
+      samp = { scope_highlight = "RenderMarkdownCodeInline" },
+      var = { scope_highlight = "@variable" },
+      strong = { scope_highlight = "@markup.strong" },
+      em = { scope_highlight = "@markup.italic" },
     },
   },
   win_options = {

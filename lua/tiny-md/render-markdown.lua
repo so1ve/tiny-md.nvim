@@ -7,6 +7,11 @@ local doc_config = {
   anti_conceal = { enabled = false },
   link = { enabled = false },
   code = { language = false },
+  html = {
+    tag = {
+      code = { scope_highlight = "RenderMarkdownCodeInline" },
+    },
+  },
   win_options = {
     concealcursor = { rendered = "nvic" },
   },

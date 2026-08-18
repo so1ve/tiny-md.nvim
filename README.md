@@ -17,8 +17,8 @@ tiny-md.nvim normalizes generated docs before render-markdown.nvim sees them: it
 ## Requirements
 
 - Neovim 0.12+
-- render-markdown.nvim
-- Treesitter parsers for `markdown` and `markdown_inline`
+- render-markdown.nvim 8.9.0+
+- Treesitter parsers for `markdown`, `markdown_inline`, and `html`
 
 ## Installation
 
@@ -111,7 +111,10 @@ By default tiny-md passes these generated-doc options:
 
 - `anti_conceal.enabled = false`
 - `link.enabled = false`
+- `html.tag.code.scope_highlight = "RenderMarkdownCodeInline"`
 - `win_options.concealcursor.rendered = "nvic"`
+
+The HTML tag setting conceals `<code>` / `</code>` and highlights their contents with `RenderMarkdownCodeInline`.
 
 Link rendering is disabled in render-markdown.nvim for generated docs because tiny-md rewrites Markdown links into compact labels and stores their target URLs for `gx` / `K`. `concealcursor` keeps table/code conceals active on the cursor row, avoiding raw Markdown reveal when moving inside a documentation float. Other render-markdown options still come from your normal config, including any `overrides.filetype.markdown_doc` or `overrides.filetype.blink-cmp-documentation` settings such as bullets, HTML comments, tables, code styling, and headings.
 

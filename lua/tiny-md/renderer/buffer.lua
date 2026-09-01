@@ -1,8 +1,8 @@
+local Code = require("tiny-md.renderer.code")
+
 local M = {}
 
-local function line_highlights(line, opts)
-  local highlights = {}
-
+local function apply_highlights(buf, ns, row, line, opts)
   for pattern, hl_group in pairs(opts.highlights or {}) do
     local from = 1
 
@@ -16,49 +16,23 @@ local function line_highlights(line, opts)
       end
 
       if from then
-        highlights[#highlights + 1] = {
+        vim.api.nvim_buf_set_extmark(buf, ns, row, from - 1, {
+          end_col = to,
           hl_group = hl_group,
-          col = from - 1,
-          length = to - from + 1,
-        }
+          priority = 120,
+        })
       end
 
       from = to and to + 1 or nil
     end
   end
-
-  return highlights
 end
 
-local function highlight_range(buf, ns, row, from, to, hl_group, priority)
-  if to <= from then
-    return
-  end
-
-  vim.api.nvim_buf_set_extmark(buf, ns, row, from, {
-    end_col = to,
-    hl_group = hl_group,
-    priority = priority or 120,
-  })
-end
-
-local function apply_highlights(buf, ns, row, line, opts)
-  for _, highlight in ipairs(line_highlights(line, opts)) do
-    highlight_range(buf, ns, row, highlight.col, highlight.col + highlight.length, highlight.hl_group, 120)
-  end
-end
-
-function M.clear(buf, ns)
+function M.render(buf, ns, doc, opts)
   vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
-  vim.b[buf].tiny_md_links = nil
-end
-
-function M.set_lines(buf, lines)
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-end
-
-function M.apply_doc(buf, ns, doc, opts)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, doc.lines)
   vim.b[buf].tiny_md_links = doc.links
+  Code.apply(buf, ns, doc.code_blocks)
 
   for row, line in ipairs(doc.lines) do
     if doc.prose[row] then
@@ -68,7 +42,15 @@ function M.apply_doc(buf, ns, doc, opts)
 
   for row, links in pairs(doc.links) do
     for _, link in ipairs(links) do
-      highlight_range(buf, ns, tonumber(row) - 1, link.from - 1, link.to, opts.link_hl, 120)
+      local from = link.from - 1
+
+      if link.to > from then
+        vim.api.nvim_buf_set_extmark(buf, ns, tonumber(row) - 1, from, {
+          end_col = link.to,
+          hl_group = opts.link_hl,
+          priority = 120,
+        })
+      end
     end
   end
 end

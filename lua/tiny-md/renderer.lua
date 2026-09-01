@@ -33,21 +33,21 @@ function M.render_text(text, opts)
 
   for raw in Text.each_line(source) do
     if code then
-      doc:add_line(raw)
-
-      if Text.closes_fence(raw, code) then
+      if Text.closes_fence(raw, code.marker) then
+        doc:add_code_block(code.lines, code.language)
         code = nil
+      else
+        code.lines[#code.lines + 1] = raw
       end
     else
       local line = raw:gsub("\\|", "|")
-      local marker
+      local marker, language
 
-      line, marker = Text.fence_line(line, opts.code_filetype)
+      marker, language = Text.fence(line, opts.code_filetype)
 
       if marker then
         flush_paragraph()
-        doc:add_line(line)
-        code = marker
+        code = { language = language, lines = {}, marker = marker }
       elseif Text.is_blank(line) then
         flush_paragraph()
         doc:add_line("")
@@ -62,31 +62,27 @@ function M.render_text(text, opts)
     end
   end
 
+  if code then
+    doc:add_code_block(code.lines, code.language)
+  end
+
   flush_paragraph()
   doc:trim_trailing_blank_lines()
 
   return doc
 end
 
-function M.clear(ctx)
-  local buf = (ctx and ctx.buf) or vim.api.nvim_get_current_buf()
-
-  Buffer.clear(buf, M.ns)
-end
-
 function M.render(ctx)
   local opts = Config.get(ctx.config)
   local buf = ctx.buf
 
-  local doc = ctx.doc or (ctx.text and M.render_text(ctx.text, opts))
+  local doc = ctx.doc
 
   if not doc then
-    return nil
+    doc = M.render_text(ctx.text, opts)
   end
 
-  M.clear({ buf = buf })
-  Buffer.set_lines(buf, doc.lines)
-  Buffer.apply_doc(buf, M.ns, doc, opts)
+  Buffer.render(buf, M.ns, doc, opts)
 
   if opts.keys then
     Links.set_keys(buf, opts)

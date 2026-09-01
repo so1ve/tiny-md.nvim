@@ -4,14 +4,6 @@ function M.split_lines(text)
   return vim.split((text or ""):gsub("\r\n", "\n"):gsub("\r", "\n"), "\n", { plain = true })
 end
 
-function M.append_lines(target, lines)
-  for _, line in ipairs(lines) do
-    target[#target + 1] = line
-  end
-
-  return target
-end
-
 local function marked_string_lines(item)
   if type(item) == "string" then
     return M.split_lines(item)
@@ -24,7 +16,7 @@ local function marked_string_lines(item)
   if item.language and item.value then
     local lines = { "```" .. item.language }
 
-    M.append_lines(lines, M.split_lines(item.value))
+    vim.list_extend(lines, M.split_lines(item.value))
     lines[#lines + 1] = "```"
 
     return lines
@@ -58,7 +50,7 @@ function M.lines(markdown)
         lines[#lines + 1] = ""
       end
 
-      M.append_lines(lines, marked_string_lines(item))
+      vim.list_extend(lines, marked_string_lines(item))
     end
 
     return lines
@@ -90,12 +82,12 @@ function M.with_detail(opts)
   local filetype = type(opts.filetype) == "string" and opts.filetype:match("^[^%.]+") or ""
   local detail_lines = { "```" .. filetype }
 
-  M.append_lines(detail_lines, M.split_lines(detail))
+  vim.list_extend(detail_lines, M.split_lines(detail))
   detail_lines[#detail_lines + 1] = "```"
 
   if M.has_content(lines) then
     detail_lines[#detail_lines + 1] = ""
-    M.append_lines(detail_lines, lines)
+    vim.list_extend(detail_lines, lines)
   end
 
   return detail_lines

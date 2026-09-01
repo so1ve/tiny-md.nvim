@@ -1,3 +1,5 @@
+local Code = require("tiny-md.renderer.code")
+
 local M = {}
 
 local applied = false
@@ -6,7 +8,6 @@ local user_config = {}
 local doc_config = {
   anti_conceal = { enabled = false },
   link = { enabled = false },
-  code = { language = false },
   html = {
     tag = {
       code = { scope_highlight = "RenderMarkdownCodeInline" },
@@ -21,49 +22,6 @@ local doc_config = {
     concealcursor = { rendered = "nvic" },
   },
 }
-
-local function watch(buf, win)
-  if not win or vim.w[win].tiny_md_render_markdown then
-    return
-  end
-
-  vim.w[win].tiny_md_render_markdown = true
-
-  local group = vim.api.nvim_create_augroup(("tiny-md-render-markdown-%d"):format(win), { clear = true })
-  local view = vim.api.nvim_win_call(win, function()
-    return ("%d:%d"):format(vim.fn.line("w0"), vim.fn.line("w$"))
-  end)
-
-  local function refresh_scrolled_view()
-    if not vim.api.nvim_win_is_valid(win) or vim.api.nvim_win_get_buf(win) ~= buf then
-      return
-    end
-
-    local next_view = vim.api.nvim_win_call(win, function()
-      return ("%d:%d"):format(vim.fn.line("w0"), vim.fn.line("w$"))
-    end)
-
-    if next_view ~= view then
-      view = next_view
-      M.refresh(buf, win)
-    end
-  end
-
-  vim.api.nvim_create_autocmd("WinScrolled", { group = group, callback = refresh_scrolled_view })
-  vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
-    group = group,
-    buffer = buf,
-    callback = refresh_scrolled_view,
-  })
-  vim.api.nvim_create_autocmd("WinClosed", {
-    group = group,
-    pattern = tostring(win),
-    once = true,
-    callback = function()
-      vim.api.nvim_del_augroup_by_id(group)
-    end,
-  })
-end
 
 function M.setup(opts)
   if opts then
@@ -93,7 +51,61 @@ local function reset_buffer_config(buf)
   end
 end
 
-function M.refresh(buf, win)
+local function render(buf, win)
+  reset_buffer_config(buf)
+
+  require("render-markdown").render({
+    buf = buf,
+    win = win,
+    event = "tiny-md",
+    config = vim.tbl_deep_extend("force", {}, doc_config, user_config),
+  })
+end
+
+local function watch(buf, win)
+  if not win or vim.w[win].tiny_md_render_markdown then
+    return
+  end
+
+  vim.w[win].tiny_md_render_markdown = true
+
+  local group = vim.api.nvim_create_augroup(("tiny-md-render-markdown-%d"):format(win), { clear = true })
+  local view = vim.api.nvim_win_call(win, function()
+    return ("%d:%d"):format(vim.fn.line("w0"), vim.fn.line("w$"))
+  end)
+
+  local function refresh_scrolled_view()
+    if not vim.api.nvim_win_is_valid(win) or vim.api.nvim_win_get_buf(win) ~= buf then
+      return
+    end
+
+    local next_view = vim.api.nvim_win_call(win, function()
+      return ("%d:%d"):format(vim.fn.line("w0"), vim.fn.line("w$"))
+    end)
+
+    if next_view ~= view then
+      view = next_view
+      render(buf, win)
+    end
+  end
+
+  vim.api.nvim_create_autocmd("WinScrolled", { group = group, callback = refresh_scrolled_view })
+  vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
+    group = group,
+    buffer = buf,
+    callback = refresh_scrolled_view,
+  })
+  vim.api.nvim_create_autocmd("WinClosed", {
+    group = group,
+    pattern = tostring(win),
+    once = true,
+    callback = function()
+      vim.api.nvim_del_augroup_by_id(group)
+    end,
+  })
+end
+
+function M.refresh(buf, win, code_blocks)
   M.setup()
 
   if not (buf and vim.api.nvim_buf_is_valid(buf)) then
@@ -104,16 +116,12 @@ function M.refresh(buf, win)
     return
   end
 
+  local parser = vim.treesitter.get_parser(buf, "markdown")
+
+  Code.configure_parser(buf, parser, code_blocks)
   vim.treesitter.start(buf, "markdown")
   watch(buf, win)
-  reset_buffer_config(buf)
-
-  require("render-markdown").render({
-    buf = buf,
-    win = win,
-    event = "tiny-md",
-    config = vim.tbl_deep_extend("force", {}, doc_config, user_config),
-  })
+  render(buf, win)
 end
 
 return M

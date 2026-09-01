@@ -7,10 +7,6 @@ local hover_method = vim.lsp.protocol.Methods.textDocument_hover
 local active
 local request_id = 0
 
-local function cursor_equal(left, right)
-  return left and right and left[1] == right[1] and left[2] == right[2]
-end
-
 local function active_hover()
   if active and active.handle and active.handle.win and vim.api.nvim_win_is_valid(active.handle.win) then
     return active
@@ -30,15 +26,13 @@ end
 
 local function focus_active(bufnr, cursor, changedtick)
   local hover = active_hover()
+  local unchanged = hover
+    and hover.source_buf == bufnr
+    and hover.changedtick == changedtick
+    and hover.cursor[1] == cursor[1]
+    and hover.cursor[2] == cursor[2]
 
-  if
-    not (
-      hover
-      and hover.source_buf == bufnr
-      and hover.changedtick == changedtick
-      and cursor_equal(hover.cursor, cursor)
-    )
-  then
+  if not unchanged then
     return false
   end
 
@@ -94,7 +88,7 @@ local function entries_text(entries, count)
         lines[#lines + 1] = ""
       end
 
-      Markdown.append_lines(lines, entry.lines)
+      vim.list_extend(lines, entry)
     end
   end
 
@@ -207,7 +201,7 @@ function M.hover(ctx)
 
       if Markdown.has_content(lines) then
         response_count = response_count + 1
-        entries[index] = { lines = lines }
+        entries[index] = lines
         render(false)
       end
 

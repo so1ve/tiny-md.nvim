@@ -37,7 +37,13 @@ local function normalize_label(label)
 end
 
 local function normalize_url(url)
-  return url and (Text.trim(url):match("^<(.+)>") or Text.trim(url)) or nil
+  if not url then
+    return
+  end
+
+  url = Text.trim(url)
+
+  return url:match("^<(.+)>") or url
 end
 
 function M.reference_definition(line)
@@ -133,11 +139,7 @@ local function parse(line, references)
     return {}
   end
 
-  local ok, trees = pcall(parser.parse, parser)
-
-  if not (ok and trees and trees[1]) then
-    return {}
-  end
+  local trees = parser:parse()
 
   local links = {}
 

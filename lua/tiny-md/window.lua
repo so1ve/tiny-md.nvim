@@ -74,14 +74,13 @@ function M.open(ctx)
 
   vim.bo[buf].buftype = "nofile"
   vim.bo[buf].bufhidden = "wipe"
-  vim.bo[buf].modifiable = true
   vim.wo[win].wrap = true
   vim.wo[win].linebreak = true
   vim.wo[win].scrolloff = 0
   vim.wo[win].sidescrolloff = 0
   vim.wo[win].conceallevel = 3
 
-  doc = Renderer.render({
+  Renderer.render({
     buf = buf,
     win = win,
     doc = doc,
@@ -89,7 +88,7 @@ function M.open(ctx)
   })
 
   vim.bo[buf].filetype = filetype
-  RenderMarkdown.refresh(buf, win)
+  RenderMarkdown.refresh(buf, win, doc.code_blocks)
   fit_height(win, max_height)
   vim.bo[buf].modifiable = false
 

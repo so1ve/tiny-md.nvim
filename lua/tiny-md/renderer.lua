@@ -18,6 +18,12 @@ function M.render_text(text, opts)
   local paragraph = {}
 
   local function add_prose(line)
+    local block = doc.code_blocks[#doc.code_blocks]
+
+    if block and block.to == #doc.lines then
+      doc:add_line("")
+    end
+
     local rendered, links = Links.render_inline(line, references)
 
     doc:add_line(rendered, { links = links, prose = true })

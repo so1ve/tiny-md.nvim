@@ -2,10 +2,8 @@ local M = {}
 
 M.defaults = {
   keys = true,
-  link_hl = "@markup.link",
   hover = {
     ["|(%S-)|"] = vim.cmd.help,
-    ["%[.-%]%((%S-)%)"] = vim.ui.open,
   },
   highlights = {
     ["|%S-|"] = "@markup.link",
@@ -24,13 +22,7 @@ function M.setup(opts)
 end
 
 function M.get(opts)
-  local options = vim.deepcopy(M.options)
-
-  if opts then
-    options = vim.tbl_deep_extend("force", options, opts)
-  end
-
-  return options
+  return vim.tbl_deep_extend("force", vim.deepcopy(M.options), opts or {})
 end
 
 return M

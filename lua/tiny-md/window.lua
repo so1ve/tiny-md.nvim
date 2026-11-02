@@ -3,20 +3,11 @@ local RenderMarkdown = require("tiny-md.render-markdown")
 
 local M = {}
 
-local function visual_height(doc, width, max_height)
-  local height = 0
-
-  for _, line in ipairs(doc.lines) do
-    height = height + math.max(1, math.ceil(vim.api.nvim_strwidth(line) / width))
-  end
-
-  return math.max(1, math.min(max_height, height))
-end
-
 local function visual_width(doc)
   local width = 0
 
   for _, line in ipairs(doc.lines) do
+    line = line:gsub("%]%b()", "]")
     width = math.max(width, vim.api.nvim_strwidth(line))
   end
 
@@ -33,7 +24,7 @@ local function hover_size(doc, opts)
   max_width = math.max(20, math.min(max_width, columns - 6))
   width = math.max(20, math.min(width, max_width))
 
-  return width, visual_height(doc, width, max_height), max_height
+  return width, max_height
 end
 
 local function fit_height(win, max_height)
@@ -57,8 +48,8 @@ function M.open(ctx)
   local text = ctx.text or ""
   local opts = vim.tbl_extend("force", { code_filetype = ctx.code_filetype or vim.bo.filetype }, ctx.config or {})
 
-  local doc = Renderer.render_text(text, opts)
-  local width, height, max_height = hover_size(doc, ctx)
+  local doc = Renderer.prepare(text, opts)
+  local width, max_height = hover_size(doc, ctx)
   local buf = vim.api.nvim_create_buf(false, true)
   local filetype = ctx.filetype or "markdown_doc"
 
@@ -67,7 +58,7 @@ function M.open(ctx)
     row = ctx.row or 1,
     col = ctx.col or 0,
     width = width,
-    height = height,
+    height = max_height,
     border = ctx.border or "rounded",
     style = "minimal",
   })
@@ -82,38 +73,26 @@ function M.open(ctx)
 
   Renderer.render({
     buf = buf,
-    win = win,
     doc = doc,
     config = opts,
   })
 
   vim.bo[buf].filetype = filetype
-  RenderMarkdown.refresh(buf, win, doc.code_blocks)
+  RenderMarkdown.render(buf, win)
   fit_height(win, max_height)
   vim.bo[buf].modifiable = false
 
-  local close_group
-
-  local function clear_autocmds()
-    if close_group then
-      vim.api.nvim_del_augroup_by_id(close_group)
-      close_group = nil
-    end
-  end
+  local group = vim.api.nvim_create_augroup(("tiny-md-window-%d"):format(win), { clear = true })
 
   local function close()
-    clear_autocmds()
-
     if vim.api.nvim_win_is_valid(win) then
       vim.api.nvim_win_close(win, true)
     end
   end
 
   if ctx.source_buf then
-    close_group = vim.api.nvim_create_augroup(("tiny-md-window-%d"):format(win), { clear = true })
-
     vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI", "InsertCharPre" }, {
-      group = close_group,
+      group = group,
       buffer = ctx.source_buf,
       callback = function()
         vim.schedule(close)
@@ -121,11 +100,11 @@ function M.open(ctx)
     })
 
     vim.api.nvim_create_autocmd("BufLeave", {
-      group = close_group,
+      group = group,
       buffer = ctx.source_buf,
       callback = function()
         vim.schedule(function()
-          if not close_group then
+          if not vim.api.nvim_win_is_valid(win) then
             return
           end
 
@@ -141,17 +120,20 @@ function M.open(ctx)
     })
 
     vim.api.nvim_create_autocmd("BufLeave", {
-      group = close_group,
+      group = group,
       buffer = buf,
       callback = close,
     })
-
-    vim.api.nvim_create_autocmd("WinClosed", {
-      group = close_group,
-      pattern = tostring(win),
-      callback = clear_autocmds,
-    })
   end
+
+  vim.api.nvim_create_autocmd("WinClosed", {
+    group = group,
+    pattern = tostring(win),
+    once = true,
+    callback = function()
+      vim.api.nvim_del_augroup_by_id(group)
+    end,
+  })
 
   vim.keymap.set("n", "q", close, { buffer = buf, silent = true, desc = "Close tiny-md hover window" })
 

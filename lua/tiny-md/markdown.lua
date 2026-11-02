@@ -1,45 +1,41 @@
 local M = {}
 
-function M.split_lines(text)
+local function split_lines(text)
   return vim.split((text or ""):gsub("\r\n", "\n"):gsub("\r", "\n"), "\n", { plain = true })
+end
+
+local function fenced_lines(language, text)
+  local lines = { "```" .. language }
+
+  vim.list_extend(lines, split_lines(text))
+  lines[#lines + 1] = "```"
+
+  return lines
 end
 
 local function marked_string_lines(item)
   if type(item) == "string" then
-    return M.split_lines(item)
+    return split_lines(item)
   end
 
-  if type(item) ~= "table" then
+  if type(item) ~= "table" or not item.value then
     return {}
   end
 
-  if item.language and item.value then
-    local lines = { "```" .. item.language }
-
-    vim.list_extend(lines, M.split_lines(item.value))
-    lines[#lines + 1] = "```"
-
-    return lines
+  if item.language then
+    return fenced_lines(item.language, item.value)
   end
 
-  if item.value then
-    return M.split_lines(item.value)
-  end
-
-  return {}
+  return split_lines(item.value)
 end
 
 function M.lines(markdown)
   if type(markdown) == "string" then
-    return M.split_lines(markdown)
+    return split_lines(markdown)
   end
 
   if type(markdown) ~= "table" then
     return {}
-  end
-
-  if markdown.kind and markdown.value then
-    return M.split_lines(markdown.value)
   end
 
   if vim.islist(markdown) then
@@ -80,10 +76,7 @@ function M.with_detail(opts)
   end
 
   local filetype = type(opts.filetype) == "string" and opts.filetype:match("^[^%.]+") or ""
-  local detail_lines = { "```" .. filetype }
-
-  vim.list_extend(detail_lines, M.split_lines(detail))
-  detail_lines[#detail_lines + 1] = "```"
+  local detail_lines = fenced_lines(filetype, detail)
 
   if M.has_content(lines) then
     detail_lines[#detail_lines + 1] = ""

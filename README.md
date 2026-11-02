@@ -6,17 +6,17 @@ A sensible embedded Markdown renderer for Neovim, powered by render-markdown.nvi
 
 LSP hover and completion docs are usually generated Markdown, not files you edit. They need tight paragraph wrapping, syntax-highlighted code, working links, and predictable scrolling.
 
-Noice already handles common Markdown shapes well enough to look nice. The hard parts are the generated-doc Markdown edges spread across editor core, parsers, renderers, and LSP output:
+Noice already handles common Markdown shapes well enough to look nice. The hard parts are the generated-doc Markdown edges spread across parsers, renderers, and LSP output:
 
 - Noice has had representative LSP Markdown issues around link escaping ([folke/noice.nvim#455](https://github.com/folke/noice.nvim/issues/455)) and concealed code/link rows affecting hover layout ([#158](https://github.com/folke/noice.nvim/issues/158)).
-- Some constraints live below plugins: concealed links can still wrap as if the hidden destination text were visible ([MeanderingProgrammer/render-markdown.nvim#82](https://github.com/MeanderingProgrammer/render-markdown.nvim/issues/82), duplicates [#160](https://github.com/MeanderingProgrammer/render-markdown.nvim/issues/160) and [#519](https://github.com/MeanderingProgrammer/render-markdown.nvim/issues/519)), which the maintainer traces to Neovim core behavior ([neovim/neovim#14409](https://github.com/neovim/neovim/issues/14409)).
+- Concealed links used to wrap using the width of their hidden destinations. Neovim 0.13's conceal-aware wrapping ([neovim/neovim#42370](https://github.com/neovim/neovim/pull/42370)) fixes this in core.
 - render-markdown.nvim integration has its own ownership and conceal tradeoffs, such as working alongside Noice/blink.cmp ([MeanderingProgrammer/render-markdown.nvim#402](https://github.com/MeanderingProgrammer/render-markdown.nvim/issues/402)) and generated documentation buffers ([#577](https://github.com/MeanderingProgrammer/render-markdown.nvim/issues/577)).
 
-tiny-md.nvim normalizes generated docs before render-markdown.nvim sees them: it joins soft-wrapped prose, rewrites Markdown links to compact labels to avoid surprise wrapping, and keeps `gx` / `K` link actions working inside documentation floats.
+tiny-md.nvim joins soft-wrapped prose, then lets Neovim and render-markdown.nvim handle links, code, and conceal natively in documentation floats.
 
 ## Requirements
 
-- Neovim 0.12+
+- Neovim 0.13+
 - render-markdown.nvim 8.9.0+
 - Treesitter parsers for `markdown`, `markdown_inline`, and `html`
 
@@ -85,10 +85,8 @@ Use tiny-md for blink.cmp documentation:
 ```lua
 require("tiny-md").setup({
   keys = true,
-  link_hl = "@markup.link",
   hover = {
     ["|(%S-)|"] = vim.cmd.help,
-    ["%[.-%]%((%S-)%)"] = vim.ui.open,
   },
   highlights = {
     ["|%S-|"] = "@markup.link",
@@ -105,20 +103,21 @@ require("tiny-md").setup({
 })
 ```
 
-tiny-md.nvim does not merge these options into your global render-markdown.nvim setup. It keeps your render-markdown spec untouched and passes generated-doc options only when tiny-md explicitly renders hover or blink.cmp documentation buffers.
+tiny-md.nvim does not change the options in your render-markdown.nvim setup spec. It passes the generated-doc options only when tiny-md renders hover or blink.cmp documentation buffers.
 
 By default tiny-md passes these generated-doc options:
 
 - `anti_conceal.enabled = false`
-- `link.enabled = false`
+- `code.border = "hide"` and `code.language = false`
+- `link.enabled = true`
 - `html.tag` mappings for `code`, `kbd`, `samp`, `var`, `strong`, and `em`
 - `win_options.concealcursor.rendered = "nvic"`
 
 The HTML tag mappings conceal their opening and closing tags. `code`, `kbd`, and `samp` use `RenderMarkdownCodeInline`; `var`, `strong`, and `em` use their corresponding Treesitter highlight groups.
 
-Link rendering is disabled in render-markdown.nvim for generated docs because tiny-md rewrites Markdown links into compact labels and stores their target URLs for `gx` / `K`. `concealcursor` keeps table/code conceals active on the cursor row, avoiding raw Markdown reveal when moving inside a documentation float. Other render-markdown options still come from your normal config, including any `overrides.filetype.markdown_doc` or `overrides.filetype.blink-cmp-documentation` settings such as bullets, HTML comments, tables, code styling, and headings.
+Neovim's Markdown Treesitter query supplies link URLs and conceals link syntax. `gx` and `K` use that metadata inside documentation floats, and custom `hover` patterns still work. `concealcursor` keeps table/code conceals active on the cursor row, avoiding raw Markdown reveal when moving inside a documentation float. Other render-markdown options still come from your normal config, including `overrides.filetype.markdown_doc` or `overrides.filetype.blink-cmp-documentation` settings for bullets, HTML comments, tables, code styling, and headings.
 
-tiny-md registers `markdown_doc` and `blink-cmp-documentation` as Markdown Treesitter filetypes, but it does not add them to render-markdown.nvim's global `file_types` list. Normal `markdown` buffers keep your render-markdown.nvim configuration.
+tiny-md registers `markdown_doc` and `blink-cmp-documentation` as Markdown Treesitter filetypes and adds them to render-markdown.nvim's runtime `file_types` list. This lets render-markdown.nvim's manager handle cursor movement and scrolling inside documentation buffers. Normal `markdown` buffers keep your render-markdown.nvim configuration.
 
 ## API
 

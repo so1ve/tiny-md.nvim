@@ -1,13 +1,13 @@
-local Code = require("tiny-md.renderer.code")
-
 local M = {}
 
 local applied = false
 local doc_filetypes = { "markdown_doc", "blink-cmp-documentation" }
-local user_config = {}
 local doc_config = {
   anti_conceal = { enabled = false },
-  link = { enabled = false },
+  code = {
+    border = "hide",
+    language = false,
+  },
   html = {
     tag = {
       code = { scope_highlight = "RenderMarkdownCodeInline" },
@@ -18,14 +18,16 @@ local doc_config = {
       em = { scope_highlight = "@markup.italic" },
     },
   },
+  link = { enabled = true },
   win_options = {
     concealcursor = { rendered = "nvic" },
   },
 }
+local config = vim.deepcopy(doc_config)
 
 function M.setup(opts)
   if opts then
-    user_config = vim.deepcopy(opts)
+    config = vim.tbl_deep_extend("force", vim.deepcopy(doc_config), opts)
   end
 
   if applied then
@@ -35,13 +37,20 @@ function M.setup(opts)
   vim.treesitter.language.register("markdown", doc_filetypes)
   require("render-markdown").setup()
 
+  local state = require("render-markdown.state")
+
+  for _, filetype in ipairs(doc_filetypes) do
+    if not vim.tbl_contains(state.file_types, filetype) then
+      state.file_types[#state.file_types + 1] = filetype
+    end
+  end
+
   applied = true
 end
 
 local function reset_buffer_config(buf)
-  -- render-markdown caches per-buffer config. If it auto-attached on FileType
-  -- before tiny-md renders, rebuild the cache so generated-doc options like
-  -- anti_conceal=false and concealcursor=nvic actually take effect.
+  -- render-markdown caches per-buffer config when FileType fires. Rebuild that
+  -- cache so generated-doc options replace the global Markdown configuration.
   require("render-markdown.state").cache[buf] = nil
 
   local decorator = require("render-markdown.core.ui").cache[buf]
@@ -51,61 +60,7 @@ local function reset_buffer_config(buf)
   end
 end
 
-local function render(buf, win)
-  reset_buffer_config(buf)
-
-  require("render-markdown").render({
-    buf = buf,
-    win = win,
-    event = "tiny-md",
-    config = vim.tbl_deep_extend("force", {}, doc_config, user_config),
-  })
-end
-
-local function watch(buf, win)
-  if not win or vim.w[win].tiny_md_render_markdown then
-    return
-  end
-
-  vim.w[win].tiny_md_render_markdown = true
-
-  local group = vim.api.nvim_create_augroup(("tiny-md-render-markdown-%d"):format(win), { clear = true })
-  local view = vim.api.nvim_win_call(win, function()
-    return ("%d:%d"):format(vim.fn.line("w0"), vim.fn.line("w$"))
-  end)
-
-  local function refresh_scrolled_view()
-    if not vim.api.nvim_win_is_valid(win) or vim.api.nvim_win_get_buf(win) ~= buf then
-      return
-    end
-
-    local next_view = vim.api.nvim_win_call(win, function()
-      return ("%d:%d"):format(vim.fn.line("w0"), vim.fn.line("w$"))
-    end)
-
-    if next_view ~= view then
-      view = next_view
-      render(buf, win)
-    end
-  end
-
-  vim.api.nvim_create_autocmd("WinScrolled", { group = group, callback = refresh_scrolled_view })
-  vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
-    group = group,
-    buffer = buf,
-    callback = refresh_scrolled_view,
-  })
-  vim.api.nvim_create_autocmd("WinClosed", {
-    group = group,
-    pattern = tostring(win),
-    once = true,
-    callback = function()
-      vim.api.nvim_del_augroup_by_id(group)
-    end,
-  })
-end
-
-function M.refresh(buf, win, code_blocks)
+function M.render(buf, win)
   M.setup()
 
   if not (buf and vim.api.nvim_buf_is_valid(buf)) then
@@ -116,12 +71,21 @@ function M.refresh(buf, win, code_blocks)
     return
   end
 
-  local parser = vim.treesitter.get_parser(buf, "markdown")
-
-  Code.configure_parser(buf, parser, code_blocks)
+  reset_buffer_config(buf)
   vim.treesitter.start(buf, "markdown")
-  watch(buf, win)
-  render(buf, win)
+  require("render-markdown").render({
+    buf = buf,
+    win = win,
+    event = "tiny-md",
+    config = config,
+  })
+
+  -- If FileType did not attach yet, cache this config before attaching.
+  local manager = require("render-markdown.core.manager")
+
+  if not manager.attached(buf) then
+    manager.attach(buf)
+  end
 end
 
 return M

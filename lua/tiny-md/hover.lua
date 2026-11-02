@@ -60,12 +60,20 @@ local function hover_clients(bufnr, providers)
   local clients = {}
   local seen = {}
 
+  local function add(provider)
+    add_client(
+      clients,
+      seen,
+      vim.lsp.get_clients({ bufnr = bufnr, method = hover_method, name = provider })[1]
+    )
+  end
+
   if type(providers) == "table" then
     for _, provider in ipairs(providers) do
-      add_client(clients, seen, vim.lsp.get_clients({ bufnr = bufnr, method = hover_method, name = provider })[1])
+      add(provider)
     end
   elseif type(providers) == "string" then
-    add_client(clients, seen, vim.lsp.get_clients({ bufnr = bufnr, method = hover_method, name = providers })[1])
+    add(providers)
   else
     for _, client in ipairs(vim.lsp.get_clients({ bufnr = bufnr, method = hover_method })) do
       add_client(clients, seen, client)

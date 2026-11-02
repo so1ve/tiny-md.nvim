@@ -18,27 +18,29 @@ function M.draw(opts)
 
   vim.api.nvim_set_option_value("modifiable", true, { buf = bufnr })
 
-  if not Markdown.has_content(lines) then
-    Renderer.render({ buf = bufnr, text = "" })
+  local function finish()
     vim.api.nvim_set_option_value("modifiable", false, { buf = bufnr })
     vim.api.nvim_set_option_value("modified", false, { buf = bufnr })
+  end
+
+  if not Markdown.has_content(lines) then
+    Renderer.render({ buf = bufnr, text = "" })
+    finish()
     return
   end
 
-  local doc = Renderer.render({
+  Renderer.render({
     buf = bufnr,
-    win = window:get_win(),
     text = table.concat(lines, "\n"),
     config = { code_filetype = filetype },
   })
 
-  vim.api.nvim_set_option_value("modifiable", false, { buf = bufnr })
-  vim.api.nvim_set_option_value("modified", false, { buf = bufnr })
+  finish()
   vim.schedule(function()
     local win = window:get_win()
 
     if win then
-      RenderMarkdown.refresh(bufnr, win, doc.code_blocks)
+      RenderMarkdown.render(bufnr, win)
     end
   end)
 end

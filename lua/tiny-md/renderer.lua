@@ -72,6 +72,12 @@ local function is_blank(line)
   return line:find("^%s*$") ~= nil
 end
 
+local function is_thematic_break(line)
+  local markers = line:gsub("[ \t]", "")
+
+  return markers:find("^%-%-%-+$") or markers:find("^%*%*%*+$") or markers:find("^___+$")
+end
+
 local function is_block_line(line)
   return line:find("^%s*#")
     or line:find("^%s*>")
@@ -83,6 +89,7 @@ local function is_block_line(line)
     or line:find("|%s*$")
     or line:find("^%s%s%s%s")
     or line:find("^\t")
+    or is_thematic_break(line)
 end
 
 local function paragraph_lines(lines)

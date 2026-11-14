@@ -219,8 +219,36 @@ local function contains(from, to, col)
   return from and to and col + 1 >= from and col + 1 <= to
 end
 
-local function open_url()
+local function has_link()
+  local position = vim.inspect_pos(nil, nil, nil, { syntax = false, semantic_tokens = false })
+
+  for _, capture in ipairs(position.treesitter) do
+    local metadata = capture.metadata[capture.id]
+
+    if metadata and metadata.url then
+      return true
+    end
+  end
+
+  for _, mark in ipairs(position.extmarks) do
+    if mark.opts.url then
+      return true
+    end
+  end
+
+  return false
+end
+
+local function open_url(lhs)
   local urls = vim.ui._get_urls()
+
+  -- _get_urls() falls back to <cfile>, even for ordinary words meant for :Man.
+  -- TODO: Remove has_link() and this filter when Neovim can return links without the <cfile> fallback.
+  if lhs == "K" and not has_link() then
+    urls = vim.tbl_filter(function(url)
+      return vim.uri.parse(url) ~= nil
+    end, urls)
+  end
 
   for _, url in ipairs(urls) do
     vim.ui.open(url)
@@ -254,7 +282,7 @@ local function open_link(opts, lhs)
   local _, col = unpack(vim.api.nvim_win_get_cursor(0))
   local line = vim.api.nvim_get_current_line()
 
-  if open_pattern(line, col, opts.hover) or open_url() then
+  if open_pattern(line, col, opts.hover) or open_url(lhs) then
     return
   end
 

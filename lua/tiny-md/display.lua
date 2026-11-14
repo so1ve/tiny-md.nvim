@@ -59,6 +59,10 @@ local function collect(context, lines, marks, links)
       local covered = row < last or to > from
       local target = rows[row + 1]
 
+      if mark.code and covered then
+        target.code = true
+      end
+
       if opts.conceal_lines and (covered or first == last) then
         target.hidden = true
       end
@@ -164,6 +168,7 @@ local function render_rows(context, lines, rows)
 
       local chunks = line:get()
 
+      chunks.code = row.code
       chunks.eol = row.eol
       output[#output + 1] = chunks
     end
@@ -176,6 +181,8 @@ end
 
 local function write(buf, rows, links)
   local lines = {}
+  local compacted = {}
+  local previous_blank = false
 
   for _, chunks in ipairs(rows) do
     local parts = {}
@@ -184,7 +191,15 @@ local function write(buf, rows, links)
       parts[#parts + 1] = chunk[1]
     end
 
-    lines[#lines + 1] = table.concat(parts)
+    local line = table.concat(parts)
+    local blank = not chunks.code and not line:find("%S")
+
+    if not (blank and previous_blank) then
+      lines[#lines + 1] = line
+      compacted[#compacted + 1] = chunks
+    end
+
+    previous_blank = blank
   end
 
   local modifiable = vim.bo[buf].modifiable
@@ -193,7 +208,7 @@ local function write(buf, rows, links)
   vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
 
-  for row, chunks in ipairs(rows) do
+  for row, chunks in ipairs(compacted) do
     local column = 0
 
     for _, chunk in ipairs(chunks) do

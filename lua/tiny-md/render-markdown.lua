@@ -83,6 +83,7 @@ function M.render(buf, win, marks)
       marks[#marks + 1] = {
         start_row = range[1],
         start_col = range[2],
+        code = node:type() == "fenced_code_block" or node:type() == "indented_code_block",
         opts = {
           end_row = range[4],
           end_col = range[5],

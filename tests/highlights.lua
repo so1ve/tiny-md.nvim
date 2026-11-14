@@ -53,6 +53,8 @@ local function run()
     [[
 # Heading
 
+
+
 **bold** *italic* ***both*** ~~deleted~~ `inline`.
 
 ```lua

@@ -52,6 +52,69 @@ preview.close()
 print("PASS: native movement and selection use the displayed text; code literals survive")
 
 preview = Window.open({
+  text = table.concat({
+    "First paragraph.",
+    "",
+    " \t",
+    "",
+    "Second paragraph.",
+    "",
+    "*@param* `value` — input",
+    "",
+    "",
+    "*@returns* — result",
+    "",
+    "```lua",
+    "first()",
+    "",
+    "",
+    "second()",
+    "```",
+    "",
+    "    indented()",
+    "",
+    "",
+    "    more()",
+    "",
+    "Before empty code.",
+    "",
+    "```",
+    "```",
+    "",
+    "After empty code.",
+  }, "\n"),
+  enter = true,
+})
+assert(
+  vim.deep_equal(lines(preview.buf), {
+    "First paragraph.",
+    "",
+    "Second paragraph.",
+    "",
+    "@param value — input",
+    "",
+    "@returns — result",
+    "",
+    "first()",
+    "",
+    "",
+    "second()",
+    "",
+    "    indented()",
+    "",
+    "",
+    "    more()",
+    "",
+    "Before empty code.",
+    "",
+    "After empty code.",
+  }),
+  vim.inspect(lines(preview.buf))
+)
+preview.close()
+print("PASS: paragraph spacing is compact while fenced and indented code keep blank lines")
+
+preview = Window.open({
   text = "**粗体**和*斜体*，`中文`，[链接](https://example.com)。 <code>printf</code>",
   enter = true,
 })

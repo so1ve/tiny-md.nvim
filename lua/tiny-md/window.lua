@@ -69,16 +69,15 @@ function M.open(ctx)
   vim.wo[win].linebreak = true
   vim.wo[win].scrolloff = 0
   vim.wo[win].sidescrolloff = 0
-  vim.wo[win].conceallevel = 3
 
-  Renderer.render({
+  local marks = Renderer.render({
     buf = buf,
     doc = doc,
     config = opts,
   })
 
   vim.bo[buf].filetype = filetype
-  RenderMarkdown.render(buf, win)
+  RenderMarkdown.render(buf, win, marks)
   fit_height(win, max_height)
   vim.bo[buf].modifiable = false
 

@@ -1,7 +1,6 @@
 local Config = require("tiny-md.config")
 
 local M = {}
-local ns = vim.api.nvim_create_namespace("tiny-md")
 
 local entities = {
   nbsp = " ",
@@ -189,7 +188,7 @@ function M.prepare(text, opts)
   return doc
 end
 
-local function apply_highlights(buf, row, line, highlights)
+local function add_highlights(marks, row, line, highlights)
   for pattern, hl_group in pairs(highlights or {}) do
     local from = 1
 
@@ -203,11 +202,11 @@ local function apply_highlights(buf, row, line, highlights)
       end
 
       if from then
-        vim.api.nvim_buf_set_extmark(buf, ns, row, from - 1, {
-          end_col = to,
-          hl_group = hl_group,
-          priority = 120,
-        })
+        marks[#marks + 1] = {
+          start_row = row,
+          start_col = from - 1,
+          opts = { end_col = to, hl_group = hl_group, priority = 120 },
+        }
       end
 
       from = to and to + 1 or nil
@@ -219,42 +218,33 @@ local function contains(from, to, col)
   return from and to and col + 1 >= from and col + 1 <= to
 end
 
-local function has_link()
-  local position = vim.inspect_pos(nil, nil, nil, { syntax = false, semantic_tokens = false })
-
-  for _, capture in ipairs(position.treesitter) do
-    local metadata = capture.metadata[capture.id]
-
-    if metadata and metadata.url then
+local function open_url(lhs)
+  local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+  local marks = vim.api.nvim_buf_get_extmarks(0, -1, { row - 1, col }, { row - 1, col }, {
+    details = true,
+    overlap = true,
+  })
+  for _, mark in ipairs(marks) do
+    if mark[4].url and (mark[4].end_row > row - 1 or mark[4].end_col > col) then
+      vim.ui.open(mark[4].url)
       return true
     end
   end
 
-  for _, mark in ipairs(position.extmarks) do
-    if mark.opts.url then
-      return true
+  if lhs == "gx" then
+    for _, url in ipairs(vim.ui._get_urls()) do
+      vim.ui.open(url)
     end
+    return true
+  end
+
+  local target = vim.fn.expand("<cfile>")
+  if vim.uri.parse(target) then
+    vim.ui.open(target)
+    return true
   end
 
   return false
-end
-
-local function open_url(lhs)
-  local urls = vim.ui._get_urls()
-
-  -- _get_urls() falls back to <cfile>, even for ordinary words meant for :Man.
-  -- TODO: Remove has_link() and this filter when Neovim can return links without the <cfile> fallback.
-  if lhs == "K" and not has_link() then
-    urls = vim.tbl_filter(function(url)
-      return vim.uri.parse(url) ~= nil
-    end, urls)
-  end
-
-  for _, url in ipairs(urls) do
-    vim.ui.open(url)
-  end
-
-  return #urls > 0
 end
 
 local function open_pattern(line, col, hover)
@@ -294,12 +284,12 @@ function M.render(ctx)
   local buf = ctx.buf
   local doc = ctx.doc or M.prepare(ctx.text, opts)
 
-  vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, doc.lines)
+  local marks = {}
 
   for row, line in ipairs(doc.lines) do
     if doc.prose[row] then
-      apply_highlights(buf, row - 1, line, opts.highlights)
+      add_highlights(marks, row - 1, line, opts.highlights)
     end
   end
 
@@ -311,7 +301,7 @@ function M.render(ctx)
     end
   end
 
-  return doc
+  return marks
 end
 
 return M

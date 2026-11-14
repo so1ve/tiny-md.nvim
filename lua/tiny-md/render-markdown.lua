@@ -1,9 +1,10 @@
+local Display = require("tiny-md.display")
+
 local M = {}
 
 local applied = false
 local doc_filetypes = { "markdown_doc", "blink-cmp-documentation" }
 local doc_config = {
-  anti_conceal = { enabled = false },
   code = {
     border = "hide",
     language = false,
@@ -19,9 +20,6 @@ local doc_config = {
     },
   },
   link = { enabled = true },
-  win_options = {
-    concealcursor = { rendered = "nvic" },
-  },
 }
 local config = vim.deepcopy(doc_config)
 
@@ -37,30 +35,10 @@ function M.setup(opts)
   vim.treesitter.language.register("markdown", doc_filetypes)
   require("render-markdown").setup()
 
-  local state = require("render-markdown.state")
-
-  for _, filetype in ipairs(doc_filetypes) do
-    if not vim.tbl_contains(state.file_types, filetype) then
-      state.file_types[#state.file_types + 1] = filetype
-    end
-  end
-
   applied = true
 end
 
-local function reset_buffer_config(buf)
-  -- render-markdown caches per-buffer config when FileType fires. Rebuild that
-  -- cache so generated-doc options replace the global Markdown configuration.
-  require("render-markdown.state").cache[buf] = nil
-
-  local decorator = require("render-markdown.core.ui").cache[buf]
-
-  if decorator then
-    decorator.running = false
-  end
-end
-
-function M.render(buf, win)
+function M.render(buf, win, marks)
   M.setup()
 
   if not (buf and vim.api.nvim_buf_is_valid(buf)) then
@@ -71,21 +49,57 @@ function M.render(buf, win)
     return
   end
 
-  reset_buffer_config(buf)
-  vim.treesitter.start(buf, "markdown")
-  require("render-markdown").render({
-    buf = buf,
-    win = win,
-    event = "tiny-md",
-    config = config,
-  })
+  marks = marks or {}
+  local parser = vim.treesitter.get_parser(buf, "markdown")
+  parser:parse(true)
+  vim.treesitter.stop(buf)
+  local state = require("render-markdown.state")
+  state.cache[buf] = nil
+  local contexts = require("render-markdown.request.context")
+  local context = contexts.new(buf, win, state.get(buf, config))
+  context.conceal.level = 3
+  -- Generated documents are rendered once, including text outside the viewport.
+  context.view.ranges = { { 0, vim.api.nvim_buf_line_count(buf) } }
 
-  -- If FileType did not attach yet, cache this config before attaching.
-  local manager = require("render-markdown.core.manager")
+  parser:for_each_tree(function(tree, language_tree)
+    local language = language_tree:lang()
+    local query = vim.treesitter.query.get(language, "highlights")
+    if not query then
+      return
+    end
 
-  if not manager.attached(buf) then
-    manager.attach(buf)
-  end
+    for id, node, metadata, match in query:iter_captures(tree:root(), buf, 0, -1) do
+      local capture = query.captures[id]
+      local data = metadata[id] or {}
+      local range = vim.treesitter.get_range(node, buf, data)
+      local conceal = data.conceal or metadata.conceal
+      if capture == "noconceal" then
+        conceal = false
+      end
+      local url = data.url
+      if type(url) == "number" then
+        url = vim.treesitter.get_node_text(assert(match:captures()[url][1]), buf, { metadata = metadata[url] })
+      end
+      marks[#marks + 1] = {
+        start_row = range[1],
+        start_col = range[2],
+        opts = {
+          end_row = range[4],
+          end_col = range[5],
+          hl_group = not capture:find("^_") and ("@" .. capture .. "." .. language) or nil,
+          priority = tonumber(data.priority or metadata.priority) or vim.hl.priorities.treesitter,
+          conceal = conceal,
+          conceal_lines = data.conceal_lines or metadata.conceal_lines,
+          url = url,
+        },
+      }
+    end
+  end)
+
+  Display.render(context, marks)
+  state.cache[buf] = nil
+  contexts.cache[buf] = nil
+  vim.wo[win].conceallevel = 0
 end
 
 return M

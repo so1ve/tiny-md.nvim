@@ -258,4 +258,88 @@ assert(handled == nil, vim.inspect(handled))
 preview.close()
 print("PASS: hover rules support language filtering and false disabling")
 
+-- Window defaults from setup() with per-call overrides.
+require("tiny-md").setup({
+  window = { border = "single", max_width = 30, max_height = 6 },
+  render_markdown = { link = { enabled = false } },
+})
+preview = Window.open({ text = string.rep("word ", 20) })
+local win_cfg = vim.api.nvim_win_get_config(preview.win)
+assert(vim.api.nvim_win_get_width(preview.win) == 30, vim.api.nvim_win_get_width(preview.win))
+assert(vim.api.nvim_win_get_height(preview.win) <= 6, vim.api.nvim_win_get_height(preview.win))
+assert(win_cfg.border and win_cfg.border[1] == "┌", vim.inspect(win_cfg.border))
+preview.close()
+
+preview = Window.open({ text = string.rep("word ", 20), border = "double", max_width = 40 })
+win_cfg = vim.api.nvim_win_get_config(preview.win)
+assert(vim.api.nvim_win_get_width(preview.win) == 40, vim.api.nvim_win_get_width(preview.win))
+assert(win_cfg.border and win_cfg.border[1] == "╔", vim.inspect(win_cfg.border))
+preview.close()
+print("PASS: window defaults apply globally and allow per-call overrides")
+
+-- Hover providers configured per language, with per-call override.
+require("tiny-md").setup({
+  providers = {
+    vue = { "vue_ls", "vtsls" },
+    rust = "rust_analyzer",
+  },
+  render_markdown = { link = { enabled = false } },
+})
+local orig_get_clients = vim.lsp.get_clients
+local requested = {}
+local function make_client(id, name)
+  return {
+    id = id,
+    name = name,
+    offset_encoding = "utf-16",
+    request = function(_, _, _, cb)
+      requested[#requested + 1] = name
+      cb(nil, nil)
+      return true
+    end,
+  }
+end
+local fake_clients = {
+  make_client(1, "vue_ls"),
+  make_client(2, "vtsls"),
+  make_client(3, "rust_analyzer"),
+  make_client(4, "eslint"),
+}
+vim.lsp.get_clients = function(filter)
+  local result = {}
+  for _, client in ipairs(fake_clients) do
+    if not filter or not filter.name or client.name == filter.name then
+      result[#result + 1] = client
+    end
+  end
+  return result
+end
+
+local Hover = require("tiny-md.hover")
+local src_buf = vim.api.nvim_create_buf(false, true)
+vim.api.nvim_buf_set_lines(src_buf, 0, -1, false, { "hello" })
+vim.api.nvim_win_set_buf(0, src_buf)
+
+vim.bo[src_buf].filetype = "vue"
+requested = {}
+Hover.hover({ bufnr = src_buf, silent = true })
+assert(vim.deep_equal(requested, { "vue_ls", "vtsls" }), vim.inspect(requested))
+
+vim.bo[src_buf].filetype = "rust"
+requested = {}
+Hover.hover({ bufnr = src_buf, silent = true })
+assert(vim.deep_equal(requested, { "rust_analyzer" }), vim.inspect(requested))
+
+vim.bo[src_buf].filetype = "lua"
+requested = {}
+Hover.hover({ bufnr = src_buf, silent = true })
+assert(#requested == 4, vim.inspect(requested))
+
+requested = {}
+Hover.hover({ bufnr = src_buf, providers = "vtsls", silent = true })
+assert(vim.deep_equal(requested, { "vtsls" }), vim.inspect(requested))
+
+vim.lsp.get_clients = orig_get_clients
+print("PASS: hover providers resolve per language and allow per-call overrides")
+
 vim.cmd.qa({ bang = true })

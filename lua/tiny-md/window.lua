@@ -1,3 +1,4 @@
+local Config = require("tiny-md.config")
 local Renderer = require("tiny-md.renderer")
 local RenderMarkdown = require("tiny-md.render-markdown")
 
@@ -47,9 +48,15 @@ function M.open(ctx)
 
   local text = ctx.text or ""
   local opts = vim.tbl_extend("force", { code_filetype = ctx.code_filetype or vim.bo.filetype }, ctx.config or {})
+  local config = Config.get(opts)
+  local window_opts = vim.tbl_extend("force", config.window or {}, {
+    border = ctx.border,
+    max_width = ctx.max_width,
+    max_height = ctx.max_height,
+  })
 
   local doc = Renderer.prepare(text, opts)
-  local width, max_height = hover_size(doc, ctx)
+  local width, max_height = hover_size(doc, window_opts)
   local buf = vim.api.nvim_create_buf(false, true)
   local filetype = ctx.filetype or "markdown_doc"
 
@@ -59,7 +66,7 @@ function M.open(ctx)
     col = ctx.col or 0,
     width = width,
     height = max_height,
-    border = ctx.border or "rounded",
+    border = window_opts.border or "rounded",
     style = "minimal",
   })
 

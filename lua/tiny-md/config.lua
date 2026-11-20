@@ -2,7 +2,14 @@ local M = {}
 
 M.defaults = {
   keys = true,
+  fenced_code_highlight = true,
   indented_code_highlight = false,
+  providers = {},
+  window = {
+    border = "rounded",
+    max_width = nil,
+    max_height = nil,
+  },
   hover = {
     ["|(%S-)|"] = vim.cmd.help,
   },

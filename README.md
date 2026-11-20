@@ -85,7 +85,14 @@ Use tiny-md for blink.cmp documentation:
 ```lua
 require("tiny-md").setup({
   keys = true,
+  fenced_code_highlight = true,
   indented_code_highlight = false,
+  providers = {},
+  window = {
+    border = "rounded",
+    max_width = nil,
+    max_height = nil,
+  },
   hover = {
     ["|(%S-)|"] = vim.cmd.help,
   },
@@ -104,12 +111,25 @@ require("tiny-md").setup({
 })
 ```
 
-`indented_code_highlight` controls whether 4-space or tab-indented Markdown code blocks are syntax-highlighted using the source buffer's language:
+`fenced_code_highlight` (default `true`) and `indented_code_highlight` (default `false`) control fallback syntax highlighting for bare fenced code blocks (```` ``` ````) and 4-space/tab-indented code blocks using the source buffer's language:
 
-- `false` (default): leave indented code blocks unhighlighted.
-- `true`: highlight indented code blocks for all languages using the current buffer's filetype.
+- `false`: disable fallback highlighting.
+- `true`: highlight using the current buffer's language.
 - `{ "typescript", "javascript" }`: enable only for the listed filetypes or Tree-sitter languages.
-- `{ typescript = true, typescriptreact = "tsx", go = false }`: enable, disable, or map a filetype/language to a specific Tree-sitter language (also supports `["*"] = true` with per-language exclusions).
+- `{ markdown = false }` / `{ typescript = true, typescriptreact = "tsx", go = false }`: enable, disable, or map a filetype/language to a specific Tree-sitter language (also supports `["*"]` wildcard).
+
+`window` configures default floating window options (`border`, `max_width`, `max_height`), which can still be overridden per call in `open()` or `hover({ preview = ... })`.
+
+`providers` configures default LSP hover clients globally or per filetype/language:
+
+```lua
+require("tiny-md").setup({
+  providers = {
+    vue = { "vue_ls", "vtsls" },
+    rust = "rust_analyzer",
+  },
+})
+```
 
 Entries in `hover` and `highlights` can also be disabled with `false` or scoped to specific languages using the same language selector format:
 

@@ -1,3 +1,4 @@
+local Config = require("tiny-md.config")
 local Markdown = require("tiny-md.markdown")
 local Window = require("tiny-md.window")
 
@@ -54,6 +55,32 @@ local function add_client(clients, seen, client)
     seen[client.id] = true
     clients[#clients + 1] = client
   end
+end
+
+local function resolve_providers(providers, bufnr)
+  if providers ~= nil then
+    return providers
+  end
+
+  local configured = Config.options.providers
+  if type(configured) == "string" then
+    return configured
+  end
+
+  if type(configured) ~= "table" or not next(configured) then
+    return nil
+  end
+
+  if #configured > 0 and vim.islist(configured) then
+    return configured
+  end
+
+  local resolved = Config.lookup_language(configured, vim.bo[bufnr].filetype)
+  if resolved then
+    return resolved
+  end
+
+  return nil
 end
 
 local function hover_clients(bufnr, providers)
@@ -134,7 +161,7 @@ function M.hover(ctx)
   request_id = request_id + 1
 
   local current_request = request_id
-  local clients = hover_clients(bufnr, ctx.providers)
+  local clients = hover_clients(bufnr, resolve_providers(ctx.providers, bufnr))
 
   if #clients == 0 then
     notify("No LSP client supports hover", vim.log.levels.INFO, ctx)

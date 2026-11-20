@@ -225,6 +225,47 @@ local value = 'string'
     },
   })
   assert(attributes("{arg}").foreground ~= 0xff00ff, "allowlisted highlight rule leaked to other language")
+
+  -- Bare fenced code block fallback highlighting config.
+  local bare_fence = "```\nlocal value = 'string'\n```"
+
+  -- Default (true): bare fence highlights with current language.
+  show(bare_fence, 52, { code_filetype = "lua" })
+  expect("local value", { foreground = 0x00ff00 })
+  expect("string", { foreground = 0x0000ff })
+
+  -- Disabled (false): bare fence stays unhighlighted, explicit fence still highlights.
+  show(bare_fence, 52, {
+    code_filetype = "lua",
+    config = { fenced_code_highlight = false },
+  })
+  expect("local value", { foreground = 0xabcdef })
+
+  show("```lua\nlocal value = 'string'\n```", 52, {
+    code_filetype = "lua",
+    config = { fenced_code_highlight = false },
+  })
+  expect("local value", { foreground = 0x00ff00 })
+
+  -- Denylist: disabling one language keeps other languages enabled.
+  show(bare_fence, 52, {
+    code_filetype = "lua",
+    config = { fenced_code_highlight = { markdown = false } },
+  })
+  expect("local value", { foreground = 0x00ff00 })
+
+  show(bare_fence, 52, {
+    code_filetype = "lua",
+    config = { fenced_code_highlight = { lua = false } },
+  })
+  expect("local value", { foreground = 0xabcdef })
+
+  -- Language remapping on bare fences.
+  show(bare_fence, 52, {
+    code_filetype = "customft",
+    config = { fenced_code_highlight = { customft = "lua" } },
+  })
+  expect("local value", { foreground = 0x00ff00 })
 end
 
 vim.api.nvim_create_autocmd("VimEnter", {

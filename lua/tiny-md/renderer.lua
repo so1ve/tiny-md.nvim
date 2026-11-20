@@ -35,7 +35,7 @@ local function each_line(text)
   return (text .. "\n"):gmatch("([^\n]*)\n")
 end
 
-local function opening_fence(line, code_filetype)
+local function opening_fence(line, opts)
   local indent, marker, info = line:match("^(%s*)(`+)(.*)$")
 
   if not marker then
@@ -48,7 +48,7 @@ local function opening_fence(line, code_filetype)
 
   info = vim.trim(info)
 
-  local language = type(code_filetype) == "string" and code_filetype:match("^[^%.]+") or nil
+  local language = Config.resolve_code_language(opts.fenced_code_highlight, opts.code_filetype, true)
   local first = info:match("^([^,%s]+)")
   local rustdoc = first
     and language == "rust"
@@ -151,7 +151,7 @@ function M.prepare(text, opts)
       end
     else
       local line = raw:gsub("\\|", "|")
-      local marker, normalized = opening_fence(line, opts.code_filetype)
+      local marker, normalized = opening_fence(line, opts)
 
       if after_code then
         after_code = false

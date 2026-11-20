@@ -109,7 +109,21 @@ require("tiny-md").setup({
 - `false` (default): leave indented code blocks unhighlighted.
 - `true`: highlight indented code blocks for all languages using the current buffer's filetype.
 - `{ "typescript", "javascript" }`: enable only for the listed filetypes or Tree-sitter languages.
-- `{ typescript = true, typescriptreact = "tsx", go = false }`: enable, disable, or map a filetype/language to a specific Tree-sitter language.
+- `{ typescript = true, typescriptreact = "tsx", go = false }`: enable, disable, or map a filetype/language to a specific Tree-sitter language (also supports `["*"] = true` with per-language exclusions).
+
+Entries in `hover` and `highlights` can also be disabled with `false` or scoped to specific languages using the same language selector format:
+
+```lua
+require("tiny-md").setup({
+  hover = {
+    ["|(%S-)|"] = { vim.cmd.help, languages = { "lua", "vim" } },
+  },
+  highlights = {
+    ["|%S-|"] = { "@markup.link", languages = { "lua", "vim" } },
+    ["{%S-}"] = false,
+  },
+})
+```
 
 tiny-md.nvim does not change the options in your render-markdown.nvim setup spec. It uses the generated-doc options when laying out hover or blink.cmp documentation buffers.
 

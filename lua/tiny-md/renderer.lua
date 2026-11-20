@@ -188,28 +188,53 @@ function M.prepare(text, opts)
   return doc
 end
 
-local function add_highlights(marks, row, line, highlights)
-  for pattern, hl_group in pairs(highlights or {}) do
-    local from = 1
+local function resolve_rule(rule, key, code_filetype)
+  if not rule then
+    return nil
+  end
 
-    while from do
-      local to, match
+  if type(rule) ~= "table" then
+    return rule
+  end
 
-      from, to, match = line:find(pattern, from)
+  local value = rule[key] or rule[1]
+  if not value then
+    return nil
+  end
 
-      if match then
-        from, to = line:find(match, from, true)
+  if not Config.match_language(rule.languages, code_filetype, true) then
+    return nil
+  end
+
+  return value
+end
+
+local function add_highlights(marks, row, line, highlights, code_filetype)
+  for pattern, rule in pairs(highlights or {}) do
+    local hl_group = resolve_rule(rule, "hl_group", code_filetype)
+
+    if type(hl_group) == "string" and hl_group ~= "" then
+      local from = 1
+
+      while from do
+        local to, match
+
+        from, to, match = line:find(pattern, from)
+
+        if match then
+          from, to = line:find(match, from, true)
+        end
+
+        if from then
+          marks[#marks + 1] = {
+            start_row = row,
+            start_col = from - 1,
+            opts = { end_col = to, hl_group = hl_group, priority = 120 },
+          }
+        end
+
+        from = to and to + 1 or nil
       end
-
-      if from then
-        marks[#marks + 1] = {
-          start_row = row,
-          start_col = from - 1,
-          opts = { end_col = to, hl_group = hl_group, priority = 120 },
-        }
-      end
-
-      from = to and to + 1 or nil
     end
   end
 end
@@ -247,21 +272,25 @@ local function open_url(lhs)
   return false
 end
 
-local function open_pattern(line, col, hover)
-  for pattern, handler in pairs(hover or {}) do
-    local from = 1
+local function open_pattern(line, col, hover, code_filetype)
+  for pattern, rule in pairs(hover or {}) do
+    local handler = resolve_rule(rule, "handler", code_filetype)
 
-    while from do
-      local to, value
+    if type(handler) == "function" then
+      local from = 1
 
-      from, to, value = line:find(pattern, from)
+      while from do
+        local to, value
 
-      if contains(from, to, col) then
-        handler(value)
-        return true
+        from, to, value = line:find(pattern, from)
+
+        if contains(from, to, col) then
+          handler(value)
+          return true
+        end
+
+        from = to and to + 1 or nil
       end
-
-      from = to and to + 1 or nil
     end
   end
 
@@ -272,7 +301,7 @@ local function open_link(opts, lhs)
   local _, col = unpack(vim.api.nvim_win_get_cursor(0))
   local line = vim.api.nvim_get_current_line()
 
-  if open_pattern(line, col, opts.hover) or open_url(lhs) then
+  if open_pattern(line, col, opts.hover, opts.code_filetype) or open_url(lhs) then
     return
   end
 
@@ -289,7 +318,7 @@ function M.render(ctx)
 
   for row, line in ipairs(doc.lines) do
     if doc.prose[row] then
-      add_highlights(marks, row - 1, line, opts.highlights)
+      add_highlights(marks, row - 1, line, opts.highlights, opts.code_filetype)
     end
   end
 

@@ -196,4 +196,66 @@ for _, text in ipairs({
 end
 print("PASS: link icons keep their targets in prose and wrapped tables")
 
+local handled
+preview = Window.open({
+  text = "See |topic| here.",
+  enter = true,
+  code_filetype = "lua",
+  config = {
+    hover = {
+      ["|(%S-)|"] = {
+        function(value)
+          handled = value
+        end,
+        languages = { "lua", "vim" },
+      },
+    },
+  },
+})
+find("topic")
+handled = nil
+press("K")
+assert(handled == "topic", vim.inspect(handled))
+preview.close()
+
+preview = Window.open({
+  text = "See |topic| here.",
+  enter = true,
+  code_filetype = "typescript",
+  config = {
+    hover = {
+      ["|(%S-)|"] = {
+        handler = function(value)
+          handled = value
+        end,
+        languages = { "lua", "vim" },
+      },
+    },
+  },
+})
+find("topic")
+handled = nil
+opened = nil
+press("gx")
+assert(handled == nil, vim.inspect(handled))
+preview.close()
+
+preview = Window.open({
+  text = "See |topic| here.",
+  enter = true,
+  code_filetype = "lua",
+  config = {
+    hover = {
+      ["|(%S-)|"] = false,
+    },
+  },
+})
+find("topic")
+handled = nil
+opened = nil
+press("gx")
+assert(handled == nil, vim.inspect(handled))
+preview.close()
+print("PASS: hover rules support language filtering and false disabling")
+
 vim.cmd.qa({ bang = true })

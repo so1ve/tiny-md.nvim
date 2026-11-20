@@ -181,6 +181,50 @@ local value = 'string'
     config = { indented_code_highlight = true },
   })
   expect("local value", { foreground = 0xabcdef })
+
+  -- Highlights rules: support `false` to disable defaults and `languages` filtering.
+  show("See |help_tag| and {arg} and @param.", 52, {
+    code_filetype = "typescript",
+    config = {
+      highlights = {
+        ["|%S-|"] = { "@markup.link", languages = { "lua", "vim" } },
+        ["{%S-}"] = false,
+        ["@%S+"] = { hl_group = "@variable.parameter", languages = { markdown = false } },
+      },
+    },
+  })
+  assert(attributes("{arg}").foreground ~= 0xff00ff, "disabled highlight rule still matched")
+  expect("@param", { foreground = 0xff00ff })
+
+  show("See |help_tag| and {arg} and @param.", 52, {
+    code_filetype = "markdown",
+    config = {
+      highlights = {
+        ["@%S+"] = { hl_group = "@variable.parameter", languages = { markdown = false } },
+      },
+    },
+  })
+  assert(attributes("@param").foreground ~= 0xff00ff, "denylisted language still matched highlight rule")
+
+  show("See {arg} here.", 52, {
+    code_filetype = "lua",
+    config = {
+      highlights = {
+        ["{%S-}"] = { "@variable.parameter", languages = { lua = true } },
+      },
+    },
+  })
+  expect("{arg}", { foreground = 0xff00ff })
+
+  show("See {arg} here.", 52, {
+    code_filetype = "typescript",
+    config = {
+      highlights = {
+        ["{%S-}"] = { "@variable.parameter", languages = { lua = true } },
+      },
+    },
+  })
+  assert(attributes("{arg}").foreground ~= 0xff00ff, "allowlisted highlight rule leaked to other language")
 end
 
 vim.api.nvim_create_autocmd("VimEnter", {

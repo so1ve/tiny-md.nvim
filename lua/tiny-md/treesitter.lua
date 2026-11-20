@@ -12,53 +12,6 @@ local function get_indented_code_query()
   return indented_code_query
 end
 
-local function resolve_indented_language(option, code_filetype)
-  if not option or type(code_filetype) ~= "string" then
-    return nil
-  end
-
-  local filetype = code_filetype:match("^[^%.]+")
-  if not filetype or filetype == "" then
-    return nil
-  end
-
-  local default_lang = vim.treesitter.language.get_lang(filetype) or filetype
-
-  if option == true then
-    return default_lang
-  end
-
-  if type(option) ~= "table" then
-    return nil
-  end
-
-  local configured = option[code_filetype]
-  if configured == nil then
-    configured = option[filetype]
-  end
-  if configured == nil and default_lang ~= filetype then
-    configured = option[default_lang]
-  end
-
-  if configured ~= nil then
-    if configured == true then
-      return default_lang
-    end
-    if type(configured) == "string" and configured ~= "" then
-      return vim.treesitter.language.get_lang(configured) or configured
-    end
-    return nil
-  end
-
-  for _, entry in ipairs(option) do
-    if entry == code_filetype or entry == filetype or entry == default_lang then
-      return default_lang
-    end
-  end
-
-  return nil
-end
-
 local function strip_code_indent(line, start_col)
   local col = 0
   local index = start_col + 1
@@ -215,7 +168,8 @@ end
 
 function M.collect(buf, marks, opts)
   local render_opts = Config.get(opts)
-  local indented_language = resolve_indented_language(render_opts.indented_code_highlight, render_opts.code_filetype)
+  local indented_language =
+    Config.resolve_code_language(render_opts.indented_code_highlight, render_opts.code_filetype, false)
 
   local parser = vim.treesitter.get_parser(buf, "markdown")
   parser:parse(true)

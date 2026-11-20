@@ -85,6 +85,7 @@ Use tiny-md for blink.cmp documentation:
 ```lua
 require("tiny-md").setup({
   keys = true,
+  indented_code_highlight = false,
   hover = {
     ["|(%S-)|"] = vim.cmd.help,
   },
@@ -102,6 +103,13 @@ require("tiny-md").setup({
   },
 })
 ```
+
+`indented_code_highlight` controls whether 4-space or tab-indented Markdown code blocks are syntax-highlighted using the source buffer's language:
+
+- `false` (default): leave indented code blocks unhighlighted.
+- `true`: highlight indented code blocks for all languages using the current buffer's filetype.
+- `{ "typescript", "javascript" }`: enable only for the listed filetypes or Tree-sitter languages.
+- `{ typescript = true, typescriptreact = "tsx", go = false }`: enable, disable, or map a filetype/language to a specific Tree-sitter language.
 
 tiny-md.nvim does not change the options in your render-markdown.nvim setup spec. It uses the generated-doc options when laying out hover or blink.cmp documentation buffers.
 

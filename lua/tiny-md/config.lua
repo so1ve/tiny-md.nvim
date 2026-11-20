@@ -2,6 +2,7 @@ local M = {}
 
 M.defaults = {
   keys = true,
+  indented_code_highlight = false,
   hover = {
     ["|(%S-)|"] = vim.cmd.help,
   },

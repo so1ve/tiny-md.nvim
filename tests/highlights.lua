@@ -10,6 +10,7 @@ for group, attributes in pairs({
   RenderMarkdownCode = { fg = "#ff0000", bg = "#102030" },
   RenderMarkdownCodeInline = { bg = "#203040" },
   RenderMarkdownH1Bg = { bg = "#302010" },
+  ["@markup.raw.block.markdown"] = { fg = "#abcdef" },
   ["@keyword.lua"] = { fg = "#00ff00" },
   ["@string.lua"] = { fg = "#0000ff" },
   ["@comment.lua"] = { fg = "#00ffff" },
@@ -23,8 +24,9 @@ local function run()
   vim.api.nvim__inspect_cell(1, 0, 0)
   local main = vim.api.nvim_get_current_win()
   local buf
-  local function show(text, width)
-    local preview = require("tiny-md.window").open({ text = text, enter = true, max_width = width })
+  local function show(text, width, extra)
+    local opts = vim.tbl_extend("force", { text = text, enter = true, max_width = width }, extra or {})
+    local preview = require("tiny-md.window").open(opts)
     buf = preview.buf
     vim.bo[buf].bufhidden = "hide"
     vim.api.nvim_win_set_buf(main, buf)
@@ -98,6 +100,87 @@ local value = 'string'
     local text = table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false), "\n")
     assert(text:find("中文", 1, true) and text:find("café", 1, true), text)
   end
+
+  local indented_sample = table.concat({
+    "Example:",
+    "",
+    "    local value = 'string'",
+    "      -- {name} @tag",
+    "",
+    "    --[[",
+    "    blockcomment",
+    "    ]]",
+    "",
+    "- outer",
+    "  - nested",
+    "    - local listword",
+  }, "\n")
+
+  -- Default (false): indented code stays unhighlighted by language parser.
+  show(indented_sample, 52, { code_filetype = "lua" })
+  expect("local value", { foreground = 0xabcdef })
+  assert(attributes("{name}").foreground ~= 0xff00ff, "prose regex highlight leaked into indented code")
+
+  -- List config: only listed languages highlight indented code blocks.
+  show(indented_sample, 52, {
+    code_filetype = "lua",
+    config = { indented_code_highlight = { "lua" } },
+  })
+  expect("local value", { foreground = 0x00ff00 })
+  expect("string", { foreground = 0x0000ff })
+  expect("{name}", { foreground = 0x00ffff })
+  expect("@tag", { foreground = 0x00ffff })
+  expect("blockcomment", { foreground = 0x00ffff })
+  assert(attributes("local listword").foreground ~= 0x00ff00, "nested list item misclassified as indented code")
+
+  show(indented_sample, 52, {
+    code_filetype = "c",
+    config = { indented_code_highlight = { "lua" } },
+  })
+  expect("local value", { foreground = 0xabcdef })
+
+  -- Map config: supports explicit boolean disable and language remapping.
+  show(indented_sample, 52, {
+    code_filetype = "customft",
+    config = { indented_code_highlight = { customft = "lua", lua = false } },
+  })
+  expect("local value", { foreground = 0x00ff00 })
+  expect("string", { foreground = 0x0000ff })
+
+  show(indented_sample, 52, {
+    code_filetype = "lua",
+    config = { indented_code_highlight = { customft = "lua", lua = false } },
+  })
+  expect("local value", { foreground = 0xabcdef })
+
+  -- Boolean true: highlights tabs and blockquote indented code blocks, and ignores missing parsers.
+  show(
+    table.concat({
+      "> Quote:",
+      ">",
+      ">     local bq = 'quoted'",
+      ">",
+      ">     -- afterblank",
+      "",
+      "\tlocal tab = 'tabbed'",
+    }, "\n"),
+    52,
+    {
+      code_filetype = "lua",
+      config = { indented_code_highlight = true },
+    }
+  )
+  expect("local bq", { foreground = 0x00ff00 })
+  expect("quoted", { foreground = 0x0000ff })
+  expect("afterblank", { foreground = 0x00ffff })
+  expect("local tab", { foreground = 0x00ff00 })
+  expect("tabbed", { foreground = 0x0000ff })
+
+  show(indented_sample, 52, {
+    code_filetype = "nonexistent_lang",
+    config = { indented_code_highlight = true },
+  })
+  expect("local value", { foreground = 0xabcdef })
 end
 
 vim.api.nvim_create_autocmd("VimEnter", {

@@ -77,7 +77,7 @@ function M.open(ctx)
   })
 
   vim.bo[buf].filetype = filetype
-  RenderMarkdown.render(buf, win, marks)
+  RenderMarkdown.render(buf, win, marks, opts)
   fit_height(win, max_height)
   vim.bo[buf].modifiable = false
 

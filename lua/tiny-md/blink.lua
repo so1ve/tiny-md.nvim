@@ -18,10 +18,11 @@ function M.draw(opts)
 
   vim.api.nvim_set_option_value("modifiable", true, { buf = bufnr })
 
+  local render_opts = { code_filetype = filetype }
   local marks = Renderer.render({
     buf = bufnr,
     text = table.concat(lines, "\n"),
-    config = { code_filetype = filetype },
+    config = render_opts,
   })
 
   vim.bo[bufnr].modifiable = false
@@ -32,7 +33,7 @@ function M.draw(opts)
     local win = window:get_win()
 
     if win and vim.api.nvim_buf_is_valid(bufnr) and vim.b[bufnr].changedtick == changedtick then
-      RenderMarkdown.render(bufnr, win, marks)
+      RenderMarkdown.render(bufnr, win, marks, render_opts)
     end
   end)
 end
